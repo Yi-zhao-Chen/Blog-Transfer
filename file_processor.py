@@ -110,17 +110,27 @@ class FileProcessor:
         - 将原始图片语法替换为 al-folio 的 figure.liquid 模板
         - 保留网络图片引用（不复制，只替换模板）
         - 重复引用的同一张图片只复制一次
+        - 仅当存在需要复制的本地图片时才创建目标目录
         """
 
         # 目标根目录：网站根目录/assets/img/posts/{output_stem}/
         website_root = Path(output_dir).parent
         dest_root = website_root / posts_img_storage_dir / output_stem
-        dest_root.mkdir(parents=True, exist_ok=True)
 
         # 缓存：源文件绝对路径 -> 相对路径（从 output_dir 到目标图片）
         image_cache = {}
+        # 标记是否已经创建目录
+        dir_created = False
+
+        def ensure_dir():
+            """确保图片目标目录存在"""
+            nonlocal dir_created
+            if not dir_created:
+                dest_root.mkdir(parents=True, exist_ok=True)
+                dir_created = True
 
         def replace_image(match):
+            nonlocal dir_created
             alt = match.group(1) # alt是md代码中对图片的描述
             raw_path = match.group(2).strip()
 
@@ -142,6 +152,9 @@ class FileProcessor:
             if src in image_cache:
                 rel_path = image_cache[src]
                 return image_render_template.format(rel_path)
+
+            # 首次复制本地图片时创建目录
+            ensure_dir()
 
             # 复制图片到目标文件夹，处理重名
             base_name = os.path.basename(src)
