@@ -5,7 +5,7 @@ from pathlib import Path
 
 import converter
 from tools.MyYaml import dump as yaml_dump
-from config import pdf_storage_dir
+from config import pdf_storage_dir,table_of_content_info
 
 
 class FileProcessor:
@@ -147,7 +147,7 @@ class FileProcessor:
             'description': metadata['description'],
             'tags': metadata.get('tags', []),
             'categories': metadata.get('categories', 'Notes'),
-            'toc': {'beginning': True}
+            'toc': table_of_content_info
         }
         return yaml_dump(front_matter), body
 

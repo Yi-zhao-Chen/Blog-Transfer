@@ -7,3 +7,6 @@ standard_output_style = {
     'math_block_begin':"$$",
     'math_block_end':"$$\n"
     }
+
+# 控制目录样式（`{'beginning': True}`对应从头开始的目录，`{'sidebar':'left',}`对应位于左侧单独成栏的目录）
+table_of_content_info = {'sidebar':'left',}
