@@ -5,7 +5,7 @@ from pathlib import Path
 
 import converter
 from tools.MyYaml import dump as yaml_dump
-from config import pdf_storage_dir,table_of_content_info
+from config import pdf_storage_dir,table_of_content_info,posts_img_storage_dir, image_render_template
 
 
 class FileProcessor:
@@ -64,14 +64,18 @@ class FileProcessor:
             os.path.getmtime(input_path)).strftime("%Y-%m-%d %H:%M:%S")
 
         _, ext = os.path.splitext(input_path.lower())
+        filename = FileProcessor._generate_filename(metadata)
         if ext == '.md':
-            front_matter, body = FileProcessor._handle_markdown(input_path, metadata)
+            # 先产生文件名和 stem
+            output_stem = Path(filename).stem
+            front_matter, body = FileProcessor._handle_markdown(
+                input_path, output_dir, output_stem, metadata
+            )
         elif ext == '.pdf':
             front_matter, body = FileProcessor._handle_pdf(input_path, output_dir, metadata)
         else:
             raise ValueError(f"不支持的文件类型：{ext}")
 
-        filename = FileProcessor._generate_filename(metadata)
         os.makedirs(output_dir, exist_ok=True)
         dest = Path(output_dir) / filename
         with open(dest, 'w', encoding='utf-8') as f:
@@ -99,16 +103,72 @@ class FileProcessor:
 
     # ---------- 私有工具 ----------
     @staticmethod
-    def _handle_markdown(input_path: str, metadata: dict):
+    def _process_images(content: str, input_md_dir: str, output_dir: str, output_stem: str) -> str:
+        """
+        处理 Markdown 中的图片引用：
+        - 复制本地图片到 assets/img/posts/{output_stem}/ 目录
+        - 将原始图片语法替换为 al-folio 的 figure.liquid 模板
+        - 保留网络图片引用（不复制，只替换模板）
+        """
+
+        # 目标根目录：网站根目录/assets/img/posts/{output_stem}/
+        # output_dir 通常是 _posts 目录，其父目录为网站根目录
+        website_root = Path(output_dir).parent
+        dest_root = website_root / posts_img_storage_dir / output_stem
+        dest_root.mkdir(parents=True, exist_ok=True)
+
+        def replace_image(match):
+            alt = match.group(1) # alt是md代码中对图片的描述
+            raw_path = match.group(2).strip()
+
+            # 网络图片：不复制，直接使用原始路径
+            if raw_path.startswith(('http://', 'https://')):
+                return image_render_template.format(raw_path)
+
+            # 本地图片：解析绝对路径
+            if os.path.isabs(raw_path):
+                src = raw_path
+            else:
+                src = os.path.join(input_md_dir, raw_path)
+
+            if not os.path.exists(src):
+                print(f"警告：图片不存在 - {src}，将保留原始语法")
+                return match.group(0)  # 保留原样
+
+            # 复制图片到目标文件夹，处理重名
+            base_name = os.path.basename(src)
+            dest_path = dest_root / base_name
+            counter = 1
+            while dest_path.exists():
+                stem, ext = os.path.splitext(base_name)
+                new_name = f"{stem}_{counter}{ext}"
+                dest_path = dest_root / new_name
+                counter += 1
+            shutil.copy2(src, dest_path)
+
+            # 计算从输出 .md 文件到图片的相对路径
+            # output_dir 是 .md 文件所在目录（例如 _posts）
+            rel_path = os.path.relpath(dest_path, start=output_dir).replace(os.sep, '/')
+            return image_render_template.format(rel_path)
+
+        # 匹配所有图片语法 ![alt](path)
+        pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+        return re.sub(pattern, replace_image, content)
+
+    @staticmethod
+    def _handle_markdown(input_path: str, output_dir: str, output_stem: str, metadata: dict):
         """
         处理Markdown文件的内部方法
         
         执行以下操作：
         1. 提取并移除原始文件的一级标题
-        2. 转换数学公式（MathJax格式）
-        3. 构建YAML front matter
+        2. 处理markdown中的图片引用
+        3. 转换数学公式（MathJax格式）
+        4. 构建YAML front matter
         
         :param input_path: Markdown文件路径
+        :param output_dir: 生成的Markdown文件路径(用于复制图片)
+        :param output_stem: 生成Markdown文件名(用于复制图片)
         :param metadata: 元数据字典（将被增强）
         :return: (front_matter, body)元组
             - front_matter: 生成的YAML格式字符串
@@ -135,6 +195,14 @@ class FileProcessor:
             r'(?:(?:^|\n)(?: {0,3}-| {0,3}\d+\.) .*\n)+(?=\n*#))',
             '\n',
             content
+        )
+
+        # 处理图片
+        content = FileProcessor._process_images(
+            content,
+            os.path.dirname(input_path),
+            output_dir,
+            output_stem
         )
 
         # 公式转换
