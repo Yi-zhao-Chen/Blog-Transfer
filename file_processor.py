@@ -109,13 +109,16 @@ class FileProcessor:
         - 复制本地图片到 assets/img/posts/{output_stem}/ 目录
         - 将原始图片语法替换为 al-folio 的 figure.liquid 模板
         - 保留网络图片引用（不复制，只替换模板）
+        - 重复引用的同一张图片只复制一次
         """
 
         # 目标根目录：网站根目录/assets/img/posts/{output_stem}/
-        # output_dir 通常是 _posts 目录，其父目录为网站根目录
         website_root = Path(output_dir).parent
         dest_root = website_root / posts_img_storage_dir / output_stem
         dest_root.mkdir(parents=True, exist_ok=True)
+
+        # 缓存：源文件绝对路径 -> 相对路径（从 output_dir 到目标图片）
+        image_cache = {}
 
         def replace_image(match):
             alt = match.group(1) # alt是md代码中对图片的描述
@@ -135,6 +138,11 @@ class FileProcessor:
                 print(f"警告：图片不存在 - {src}，将保留原始语法")
                 return match.group(0)  # 保留原样
 
+            # 检查是否已处理过该图片
+            if src in image_cache:
+                rel_path = image_cache[src]
+                return image_render_template.format(rel_path)
+
             # 复制图片到目标文件夹，处理重名
             base_name = os.path.basename(src)
             dest_path = dest_root / base_name
@@ -147,8 +155,9 @@ class FileProcessor:
             shutil.copy2(src, dest_path)
 
             # 计算从输出 .md 文件到图片的相对路径
-            # output_dir 是 .md 文件所在目录（例如 _posts）
             rel_path = os.path.relpath(dest_path, start=output_dir).replace(os.sep, '/')
+            # 存入缓存
+            image_cache[src] = rel_path
             return image_render_template.format(rel_path)
 
         # 匹配所有图片语法 ![alt](path)
