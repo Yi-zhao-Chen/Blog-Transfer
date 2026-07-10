@@ -18,4 +18,4 @@ image_render_template = '''
 '''
 
 # 控制目录样式（`{'beginning': True}`对应从头开始的目录，`{'sidebar':'left',}`对应位于左侧单独成栏的目录）
-table_of_content_info = {'sidebar':'left',}
+table_of_content_info = {'beginning':'true',}
