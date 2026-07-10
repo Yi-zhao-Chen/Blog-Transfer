@@ -65,7 +65,9 @@ class MainWindow(QMainWindow):
         self.on_file_select = on_file_select
         self.on_submit = on_submit
         self.settings = QSettings("my_org", "md_pdf_poster")
-        self._last_dir = self.settings.value("last_dir", os.getcwd())
+        # 分别读取文件选择目录和输出目录
+        self._last_file_dir = self.settings.value("last_file_dir", os.getcwd())
+        self._last_out_dir = self.settings.value("last_out_dir", os.getcwd())
         self._init_ui()
 
     # ---------- 界面初始化 ----------
@@ -147,7 +149,7 @@ class MainWindow(QMainWindow):
         
         :return: 当前输出目录路径
         """
-        return self._last_dir
+        return self._last_out_dir
 
     def show_error(self, msg: str):
         """
@@ -178,11 +180,14 @@ class MainWindow(QMainWindow):
         """
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择 Markdown 或 PDF 文件",
-            self._last_dir,
+            self._last_file_dir,                # 使用文件记忆目录
             "支持文件 (*.md *.pdf)"
         )
         if file_path:
             self.lbl_file.setText(file_path)
+            # 更新文件选择目录为当前文件所在目录
+            self._last_file_dir = os.path.dirname(file_path)
+            self.settings.setValue("last_file_dir", self._last_file_dir)
             self.on_file_select(file_path)
 
     def _choose_out_dir(self):
@@ -195,11 +200,11 @@ class MainWindow(QMainWindow):
         3. 保存新目录到设置
         """
         new_dir = QFileDialog.getExistingDirectory(
-            self, "选择输出目录", self._last_dir)
+            self, "选择输出目录", self._last_out_dir)   # 使用输出记忆目录
         if new_dir:
-            self._last_dir = new_dir
+            self._last_out_dir = new_dir
             self.lbl_out.setText(new_dir)
-            self.settings.setValue("last_dir", new_dir)
+            self.settings.setValue("last_out_dir", new_dir)
 
     def _do_submit(self):
         """
