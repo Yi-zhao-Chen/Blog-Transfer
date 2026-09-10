@@ -57,8 +57,9 @@ class FileProcessor:
         :raises ValueError: 当遇到不支持的文件类型时
         :raises 其他异常: 文件操作或处理过程中可能出现的异常
         """
-        # 将metadata['title']中的冒号替换为'-'
+        # 将metadata['title']和metadata['description']中的冒号替换为'-'
         metadata['title'] = re.sub(r':+', '-', metadata['title']).strip()
+        metadata['description'] = re.sub(r':+', '-', metadata['title']).strip()
 
         metadata['time'] = datetime.fromtimestamp(
             os.path.getmtime(input_path)).strftime("%Y-%m-%d %H:%M:%S")
